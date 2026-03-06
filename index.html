@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyber Ireland RAG — Agent Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:        #080c10;
+    --surface:   #0d1520;
+    --border:    #1a2d40;
+    --accent:    #00e5ff;
+    --accent2:   #00ff88;
+    --warn:      #ffb800;
+    --danger:    #ff3d6b;
+    --text:      #c8d8e8;
+    --dim:       #4a6070;
+    --mono:      'Share Tech Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,229,255,0.015) 2px,
+      rgba(0,229,255,0.015) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(90deg, rgba(0,229,255,0.04) 0%, transparent 100%);
+    position: sticky; top: 0; z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 14px;
+  }
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: conic-gradient(from 180deg, var(--accent), var(--accent2), var(--accent));
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    animation: spin 8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: #fff;
+  }
+  .logo-text span { color: var(--accent); }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    border-radius: 100px;
+  }
+  .status-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--dim);
+    transition: background 0.3s;
+  }
+  .status-dot.online { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+  .status-dot.thinking { background: var(--warn); animation: blink 0.6s infinite; }
+  .status-dot.error { background: var(--danger); }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 1fr 400px;
+    height: calc(100vh - 65px);
+  }
+
+  /* ── LEFT PANEL — QUERY + ANSWER ── */
+  .main-panel {
+    display: flex; flex-direction: column;
+    border-right: 1px solid var(--border);
+    overflow: hidden;
+  }
+
+  .query-area {
+    padding: 24px 28px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .query-label {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--accent);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .query-label::before {
+    content: '//';
+    opacity: 0.5;
+  }
+
+  .preset-queries {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px;
+  }
+
+  .preset-btn {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 5px 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+    line-height: 1.3;
+  }
+  .preset-btn:hover {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(0,229,255,0.05);
+  }
+  .preset-btn.t1:hover { border-color: var(--accent); color: var(--accent); }
+  .preset-btn.t2:hover { border-color: var(--accent2); color: var(--accent2); }
+  .preset-btn.t3:hover { border-color: var(--warn); color: var(--warn); }
+
+  .input-row {
+    display: flex; gap: 10px;
+  }
+
+  textarea {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    padding: 12px 14px;
+    resize: vertical;
+    min-height: 72px;
+    outline: none;
+    transition: border-color 0.2s;
+    line-height: 1.6;
+  }
+  textarea:focus { border-color: var(--accent); }
+  textarea::placeholder { color: var(--dim); }
+
+  .send-btn {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border: none;
+    border-radius: 6px;
+    color: #000;
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 0 20px;
+    cursor: pointer;
+    transition: transform 0.15s, opacity 0.15s;
+    align-self: flex-end;
+    height: 44px;
+    min-width: 80px;
+  }
+  .send-btn:hover { transform: translateY(-1px); opacity: 0.9; }
+  .send-btn:active { transform: translateY(0); }
+  .send-btn:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  /* ── API BASE URL ── */
+  .api-config {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 28px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(0,0,0,0.3);
+  }
+  .api-config label {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    letter-spacing: 1px;
+    white-space: nowrap;
+  }
+  .api-config input {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--accent2);
+    font-family: var(--mono);
+    font-size: 11px;
+    padding: 5px 10px;
+    outline: none;
+  }
+  .api-config input:focus { border-color: var(--accent2); }
+
+  /* ── ANSWER AREA ── */
+  .answer-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px 28px;
+  }
+  .answer-area::-webkit-scrollbar { width: 4px; }
+  .answer-area::-webkit-scrollbar-track { background: transparent; }
+  .answer-area::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .empty-state {
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    height: 100%;
+    gap: 16px;
+    color: var(--dim);
+  }
+  .empty-grid {
+    display: grid;
+    grid-template-columns: repeat(8, 24px);
+    grid-template-rows: repeat(5, 24px);
+    gap: 4px;
+    opacity: 0.3;
+  }
+  .empty-grid span {
+    width: 24px; height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    animation: pulse-grid 3s ease-in-out infinite;
+  }
+  .empty-grid span:nth-child(3n) { animation-delay: 0.5s; }
+  .empty-grid span:nth-child(5n) { animation-delay: 1s; }
+  @keyframes pulse-grid { 0%,100%{opacity:0.2} 50%{opacity:0.8} }
+  .empty-text { font-family: var(--mono); font-size: 13px; letter-spacing: 2px; }
+
+  /* Answer card */
+  .answer-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    animation: fadeSlideIn 0.4s ease;
+  }
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .answer-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 18px;
+    background: rgba(0,229,255,0.04);
+    border-bottom: 1px solid var(--border);
+  }
+  .answer-meta {
+    display: flex; align-items: center; gap: 12px;
+    font-family: var(--mono); font-size: 11px;
+  }
+  .tag {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+  .tag-verification { background: rgba(0,229,255,0.15); color: var(--accent); border: 1px solid rgba(0,229,255,0.3); }
+  .tag-synthesis     { background: rgba(0,255,136,0.15); color: var(--accent2); border: 1px solid rgba(0,255,136,0.3); }
+  .tag-forecasting   { background: rgba(255,184,0,0.15); color: var(--warn); border: 1px solid rgba(255,184,0,0.3); }
+  .tag-general       { background: rgba(200,216,232,0.1); color: var(--text); border: 1px solid var(--border); }
+
+  .grounding-badge {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 10px; font-family: var(--mono);
+  }
+  .grounding-bar {
+    width: 60px; height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .grounding-fill {
+    height: 100%;
+    border-radius: 2px;
+    background: linear-gradient(90deg, var(--danger), var(--warn), var(--accent2));
+    transition: width 0.8s ease;
+  }
+
+  .answer-body {
+    padding: 20px 18px;
+    font-size: 14px;
+    line-height: 1.8;
+    color: var(--text);
+    white-space: pre-wrap;
+    font-family: var(--mono);
+  }
+
+  .calc-block {
+    margin-top: 14px;
+    background: rgba(0,0,0,0.4);
+    border: 1px solid rgba(255,184,0,0.3);
+    border-radius: 6px;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--warn);
+  }
+  .calc-block-label {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    margin-bottom: 8px;
+  }
+
+  /* ── RIGHT PANEL — TRACE ── */
+  .right-panel {
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    background: var(--bg);
+  }
+
+  .panel-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .tab {
+    flex: 1;
+    padding: 12px 8px;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--dim);
+    text-align: center;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .tab-content {
+    flex: 1; overflow-y: auto;
+    display: none;
+    padding: 16px;
+  }
+  .tab-content.active { display: block; }
+  .tab-content::-webkit-scrollbar { width: 3px; }
+  .tab-content::-webkit-scrollbar-thumb { background: var(--border); }
+
+  /* Steps trace */
+  .steps-empty {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--dim);
+    text-align: center;
+    margin-top: 40px;
+    letter-spacing: 2px;
+  }
+
+  .step-item {
+    display: flex; gap: 10px;
+    margin-bottom: 10px;
+    animation: fadeSlideIn 0.3s ease both;
+  }
+
+  .step-line {
+    display: flex; flex-direction: column;
+    align-items: center;
+    min-width: 28px;
+  }
+  .step-node {
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    border: 1.5px solid;
+  }
+  .step-connector {
+    width: 1px; flex: 1;
+    background: var(--border);
+    margin: 2px 0;
+    min-height: 12px;
+  }
+
+  .node-classify_query   { background: rgba(0,229,255,0.1);   border-color: var(--accent);  color: var(--accent); }
+  .node-retrieve         { background: rgba(0,255,136,0.1);   border-color: var(--accent2); color: var(--accent2); }
+  .node-grade_documents  { background: rgba(255,184,0,0.1);   border-color: var(--warn);    color: var(--warn); }
+  .node-rewrite_query    { background: rgba(255,61,107,0.1);  border-color: var(--danger);  color: var(--danger); }
+  .node-retrieval_agent  { background: rgba(0,229,255,0.1);   border-color: var(--accent);  color: var(--accent); }
+  .node-synthesis_agent  { background: rgba(0,255,136,0.1);   border-color: var(--accent2); color: var(--accent2); }
+  .node-math_agent       { background: rgba(255,184,0,0.1);   border-color: var(--warn);    color: var(--warn); }
+  .node-calculate        { background: rgba(255,184,0,0.15);  border-color: var(--warn);    color: var(--warn); }
+  .node-reflect          { background: rgba(150,100,255,0.1); border-color: #9664ff;         color: #9664ff; }
+  .node-format_final_answer { background: rgba(0,255,136,0.15); border-color: var(--accent2); color: var(--accent2); }
+
+  .step-body { flex: 1; }
+  .step-name {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 4px;
+    letter-spacing: 0.5px;
+  }
+  .step-detail {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--dim);
+    line-height: 1.5;
+    word-break: break-all;
+  }
+  .step-time {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--dim);
+    margin-top: 3px;
+    opacity: 0.6;
+  }
+
+  /* LangGraph diagram */
+  #graph-tab { font-family: var(--mono); }
+
+  .graph-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    overflow-x: auto;
+  }
+
+  svg.graph-svg {
+    width: 100%;
+    min-width: 340px;
+  }
+
+  .g-node rect {
+    fill: var(--bg);
+    stroke: var(--border);
+    rx: 6px;
+    transition: all 0.2s;
+  }
+  .g-node text {
+    fill: var(--dim);
+    font-family: var(--mono);
+    font-size: 9px;
+  }
+  .g-node.active rect { stroke: var(--accent); }
+  .g-node.active text { fill: var(--accent); }
+
+  /* Metrics bar */
+  .metrics-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  .metric-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .metric-label {
+    font-family: var(--mono);
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .metric-value {
+    font-family: var(--mono);
+    font-size: 18px;
+    font-weight: 600;
+  }
+  .metric-value.accent  { color: var(--accent); }
+  .metric-value.accent2 { color: var(--accent2); }
+  .metric-value.warn    { color: var(--warn); }
+  .metric-value.danger  { color: var(--danger); }
+
+  /* Loading animation */
+  .thinking-anim {
+    display: none;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+  }
+  .thinking-anim.show { display: flex; }
+  .thinking-dots span {
+    display: inline-block;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: var(--accent);
+    margin: 0 2px;
+    animation: bounce 1s infinite;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.15s; background: var(--accent2); }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.3s; background: var(--warn); }
+  @keyframes bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-8px)} }
+
+  .error-card {
+    background: rgba(255,61,107,0.08);
+    border: 1px solid rgba(255,61,107,0.3);
+    border-radius: 8px;
+    padding: 16px 18px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--danger);
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon"></div>
+    <div>
+      <div class="logo-text"><span>Cyber Ireland</span> RAG System</div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:2px;margin-top:1px">MULTI-AGENT · LANGGRAPH · GROQ</div>
+    </div>
+  </div>
+  <div class="status-pill">
+    <div class="status-dot" id="statusDot"></div>
+    <span id="statusText">IDLE</span>
+  </div>
+</header>
+
+<div class="app">
+
+  <!-- ── LEFT PANEL ── -->
+  <div class="main-panel">
+
+    <!-- API Config -->
+    <div class="api-config">
+      <label>API BASE URL</label>
+      <input type="text" id="apiBase" value="http://localhost:8000"  />
+      <button class="send-btn" style="height:30px;min-width:60px;font-size:10px;" onclick="pingHealth()">PING</button>
+    </div>
+
+    <!-- Query Area -->
+    <div class="query-area">
+      <div class="query-label">Run Query</div>
+
+      <!-- Preset test queries -->
+      <div class="preset-queries">
+        <button class="preset-btn t1" onclick="loadPreset(0)">
+          TEST 1 — Verification<br>
+          <span style="opacity:0.6">Total jobs + exact citation</span>
+        </button>
+        <button class="preset-btn t2" onclick="loadPreset(1)">
+          TEST 2 — Synthesis<br>
+          <span style="opacity:0.6">South-West vs National Avg</span>
+        </button>
+        <button class="preset-btn t3" onclick="loadPreset(2)">
+          TEST 3 — CAGR Forecast<br>
+          <span style="opacity:0.6">2022→2030 growth rate</span>
+        </button>
+      </div>
+
+      <div class="input-row">
+        <textarea id="queryInput" placeholder="Ask anything about the Cyber Ireland 2022 report…&#10;e.g. How many Pure-Play cybersecurity firms are in Dublin?"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="runQuery()">RUN</button>
+      </div>
+    </div>
+
+    <!-- Thinking animation -->
+    <div class="thinking-anim" id="thinkingAnim">
+      <div class="thinking-dots">
+        <span></span><span></span><span></span>
+      </div>
+      <span id="thinkingText">Agent initialising…</span>
+    </div>
+
+    <!-- Answer -->
+    <div class="answer-area" id="answerArea">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-grid">
+          ${Array(40).fill('<span></span>').join('')}
+        </div>
+        <div class="empty-text">// AWAITING QUERY</div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT PANEL ── -->
+  <div class="right-panel">
+
+    <div class="panel-tabs">
+      <button class="tab active" onclick="switchTab('trace')">AGENT TRACE</button>
+      <button class="tab" onclick="switchTab('graph')">GRAPH</button>
+      <button class="tab" onclick="switchTab('metrics')">METRICS</button>
+    </div>
+
+    <!-- TRACE TAB -->
+    <div class="tab-content active" id="trace-tab">
+      <div id="stepsContainer">
+        <div class="steps-empty">// NO TRACE YET</div>
+      </div>
+    </div>
+
+    <!-- GRAPH TAB -->
+    <div class="tab-content" id="graph-tab">
+      <div class="graph-container">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--accent);letter-spacing:2px;margin-bottom:12px">// LANGGRAPH PIPELINE</div>
+        <svg class="graph-svg" viewBox="0 0 340 640" fill="none" xmlns="http://www.w3.org/2000/svg" id="graphSvg">
+          <!-- Defs -->
+          <defs>
+            <marker id="arrowhead" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+              <polygon points="0 0, 6 2, 0 4" fill="#1a2d40"/>
+            </marker>
+            <marker id="arrowhead-accent" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+              <polygon points="0 0, 6 2, 0 4" fill="#00e5ff"/>
+            </marker>
+            <marker id="arrowhead-warn" markerWidth="6" markerHeight="4" refX="6" refY="2" orient="auto">
+              <polygon points="0 0, 6 2, 0 4" fill="#ffb800"/>
+            </marker>
+          </defs>
+
+          <!-- Nodes -->
+          <!-- classify_query -->
+          <rect x="100" y="10" width="140" height="30" rx="5" fill="#0d1520" stroke="#00e5ff" stroke-width="1"/>
+          <text x="170" y="29" text-anchor="middle" fill="#00e5ff" font-family="Share Tech Mono" font-size="10">classify_query</text>
+
+          <!-- retrieve -->
+          <rect x="100" y="65" width="140" height="30" rx="5" fill="#0d1520" stroke="#00ff88" stroke-width="1"/>
+          <text x="170" y="84" text-anchor="middle" fill="#00ff88" font-family="Share Tech Mono" font-size="10">retrieve</text>
+
+          <!-- grade_documents -->
+          <rect x="100" y="120" width="140" height="30" rx="5" fill="#0d1520" stroke="#ffb800" stroke-width="1"/>
+          <text x="170" y="139" text-anchor="middle" fill="#ffb800" font-family="Share Tech Mono" font-size="10">grade_documents</text>
+
+          <!-- rewrite_query (side) -->
+          <rect x="230" y="175" width="100" height="30" rx="5" fill="#0d1520" stroke="#ff3d6b" stroke-width="1" stroke-dasharray="4,2"/>
+          <text x="280" y="194" text-anchor="middle" fill="#ff3d6b" font-family="Share Tech Mono" font-size="9">rewrite_query</text>
+
+          <!-- Three specialist agents -->
+          <rect x="5" y="235" width="100" height="30" rx="5" fill="#0d1520" stroke="#00e5ff" stroke-width="1"/>
+          <text x="55" y="254" text-anchor="middle" fill="#00e5ff" font-family="Share Tech Mono" font-size="8">retrieval_agent</text>
+
+          <rect x="120" y="235" width="100" height="30" rx="5" fill="#0d1520" stroke="#00ff88" stroke-width="1"/>
+          <text x="170" y="254" text-anchor="middle" fill="#00ff88" font-family="Share Tech Mono" font-size="8">synthesis_agent</text>
+
+          <rect x="235" y="235" width="100" height="30" rx="5" fill="#0d1520" stroke="#ffb800" stroke-width="1"/>
+          <text x="285" y="254" text-anchor="middle" fill="#ffb800" font-family="Share Tech Mono" font-size="8">math_agent</text>
+
+          <!-- calculate -->
+          <rect x="235" y="295" width="100" height="30" rx="5" fill="#0d1520" stroke="#ffb800" stroke-width="1" stroke-dasharray="4,2"/>
+          <text x="285" y="314" text-anchor="middle" fill="#ffb800" font-family="Share Tech Mono" font-size="9">calculate</text>
+
+          <!-- reflect -->
+          <rect x="100" y="360" width="140" height="30" rx="5" fill="#0d1520" stroke="#9664ff" stroke-width="1"/>
+          <text x="170" y="379" text-anchor="middle" fill="#9664ff" font-family="Share Tech Mono" font-size="10">reflect (Self-RAG)</text>
+
+          <!-- format_final_answer -->
+          <rect x="100" y="430" width="140" height="30" rx="5" fill="#0d1520" stroke="#00ff88" stroke-width="1.5"/>
+          <text x="170" y="449" text-anchor="middle" fill="#00ff88" font-family="Share Tech Mono" font-size="9">format_final_answer</text>
+
+          <!-- END -->
+          <rect x="130" y="495" width="80" height="28" rx="14" fill="rgba(0,255,136,0.1)" stroke="#00ff88" stroke-width="1"/>
+          <text x="170" y="513" text-anchor="middle" fill="#00ff88" font-family="Share Tech Mono" font-size="10">END</text>
+
+          <!-- ── ARROWS ── -->
+          <!-- classify → retrieve -->
+          <line x1="170" y1="40" x2="170" y2="63" stroke="#1a2d40" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+          <!-- retrieve → grade -->
+          <line x1="170" y1="95" x2="170" y2="118" stroke="#1a2d40" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+          <!-- grade → specialists (fan out) -->
+          <path d="M 130 150 L 55 233" stroke="#1a2d40" stroke-width="1" fill="none" marker-end="url(#arrowhead)"/>
+          <line x1="170" y1="150" x2="170" y2="233" stroke="#1a2d40" stroke-width="1" marker-end="url(#arrowhead)"/>
+          <path d="M 210 150 L 285 233" stroke="#1a2d40" stroke-width="1" fill="none" marker-end="url(#arrowhead)"/>
+
+          <!-- grade → rewrite (CRAG fail) -->
+          <path d="M 230 135 L 255 135 L 255 173" stroke="#ff3d6b" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#arrowhead-warn)"/>
+          <text x="237" y="130" fill="#ff3d6b" font-family="Share Tech Mono" font-size="7">fail</text>
+
+          <!-- rewrite → retrieve (loop back) -->
+          <path d="M 280 175 L 310 80 L 242 80" stroke="#ff3d6b" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#arrowhead-warn)"/>
+
+          <!-- math → calculate -->
+          <line x1="285" y1="265" x2="285" y2="293" stroke="#ffb800" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#arrowhead)"/>
+
+          <!-- specialists → reflect -->
+          <path d="M 55 265 L 55 375 L 98 375" stroke="#1a2d40" stroke-width="1" fill="none" marker-end="url(#arrowhead)"/>
+          <line x1="170" y1="265" x2="170" y2="358" stroke="#1a2d40" stroke-width="1" marker-end="url(#arrowhead)"/>
+          <path d="M 285 325 L 285 375 L 242 375" stroke="#1a2d40" stroke-width="1" fill="none" marker-end="url(#arrowhead)"/>
+
+          <!-- reflect → format -->
+          <line x1="170" y1="390" x2="170" y2="428" stroke="#9664ff" stroke-width="1" marker-end="url(#arrowhead)"/>
+          <text x="176" y="415" fill="#9664ff" font-family="Share Tech Mono" font-size="7">grounded</text>
+
+          <!-- reflect self-loop (regen) -->
+          <path d="M 100 375 L 60 375 L 60 250 L 103 250" stroke="#9664ff" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#arrowhead)"/>
+          <text x="22" y="315" fill="#9664ff" font-family="Share Tech Mono" font-size="7">regen</text>
+
+          <!-- format → END -->
+          <line x1="170" y1="460" x2="170" y2="493" stroke="#00ff88" stroke-width="1" marker-end="url(#arrowhead)"/>
+
+          <!-- Labels -->
+          <text x="52" y="223" fill="#4a6070" font-family="Share Tech Mono" font-size="7">verif.</text>
+          <text x="155" y="223" fill="#4a6070" font-family="Share Tech Mono" font-size="7">synth.</text>
+          <text x="268" y="223" fill="#4a6070" font-family="Share Tech Mono" font-size="7">math</text>
+        </svg>
+      </div>
+
+      <div style="margin-top:12px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:6px;">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:1.5px;margin-bottom:8px">// ACTIVE NODE</div>
+        <div id="activeNodeLabel" style="font-family:var(--mono);font-size:12px;color:var(--dim)">—</div>
+      </div>
+    </div>
+
+    <!-- METRICS TAB -->
+    <div class="tab-content" id="metrics-tab">
+      <div class="metrics-bar">
+        <div class="metric-card">
+          <div class="metric-label">Query Type</div>
+          <div class="metric-value accent" id="m-querytype">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Duration</div>
+          <div class="metric-value accent2" id="m-duration">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Grounding</div>
+          <div class="metric-value warn" id="m-grounding">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">CRAG Pass</div>
+          <div class="metric-value accent2" id="m-crag">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Retrieval Tries</div>
+          <div class="metric-value" id="m-retries">—</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-label">Agent Steps</div>
+          <div class="metric-value accent" id="m-steps">—</div>
+        </div>
+      </div>
+
+      <div id="calcBlock" style="display:none">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--warn);letter-spacing:2px;margin-bottom:8px">// CALCULATION RESULT</div>
+        <div class="calc-block">
+          <div class="calc-block-label">SAFE PYTHON EVAL OUTPUT</div>
+          <div id="calcResult"></div>
+        </div>
+      </div>
+
+      <div style="margin-top:14px">
+        <div style="font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:2px;margin-bottom:8px">// RAW JSON RESPONSE</div>
+        <pre id="rawJson" style="font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;overflow:auto;max-height:300px;white-space:pre-wrap;word-break:break-all"></pre>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const PRESETS = [
+  `What is the total number of jobs reported in the Cyber Ireland 2022 report? Provide the exact page number and a verbatim citation from the document.`,
+  `Compare the concentration of 'Pure-Play' cybersecurity firms in the South-West region against the National Average. Include exact figures and calculate the difference or ratio.`,
+  `Based on the 2022 baseline job figures and the stated 2030 job target in the report, what is the required Compound Annual Growth Rate (CAGR) to achieve that goal? Show your calculation.`
+];
+
+function loadPreset(i) {
+  document.getElementById('queryInput').value = PRESETS[i];
+  document.getElementById('queryInput').focus();
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById(`${name}-tab`).classList.add('active');
+}
+
+function setStatus(state) {
+  const dot  = document.getElementById('statusDot');
+  const text = document.getElementById('statusText');
+  dot.className = `status-dot ${state}`;
+  const labels = { idle:'IDLE', online:'ONLINE', thinking:'RUNNING', error:'ERROR' };
+  text.textContent = labels[state] || state.toUpperCase();
+}
+
+async function pingHealth() {
+  const base = document.getElementById('apiBase').value.trim();
+  try {
+    const r = await fetch(`${base}/health`, { signal: AbortSignal.timeout(4000) });
+    const d = await r.json();
+    setStatus('online');
+    alert(`✅ API Online\nModel: ${d.models?.main_llm}\nEmbeddings: ${d.models?.embeddings}`);
+  } catch(e) {
+    setStatus('error');
+    alert(`❌ Cannot reach API at ${base}\nMake sure uvicorn is running:\nuvicorn main:app --reload --port 8000`);
+  }
+}
+
+const NODE_ABBR = {
+  classify_query: 'CQ', retrieve: 'RT', grade_documents: 'GD',
+  rewrite_query: 'RW', retrieval_agent: 'RA', synthesis_agent: 'SA',
+  math_agent: 'MA', calculate: 'CA', reflect: 'RF', format_final_answer: 'FA'
+};
+
+function renderSteps(steps) {
+  const container = document.getElementById('stepsContainer');
+  if (!steps || steps.length === 0) {
+    container.innerHTML = '<div class="steps-empty">// NO TRACE YET</div>';
+    return;
+  }
+
+  container.innerHTML = steps.map((s, i) => {
+    const abbr  = NODE_ABBR[s.node] || s.node.substring(0,2).toUpperCase();
+    const time  = s.timestamp ? new Date(s.timestamp).toLocaleTimeString() : '';
+    const isLast = i === steps.length - 1;
+    return `
+      <div class="step-item" style="animation-delay:${i*0.06}s">
+        <div class="step-line">
+          <div class="step-node node-${s.node}">${abbr}</div>
+          ${!isLast ? '<div class="step-connector"></div>' : ''}
+        </div>
+        <div class="step-body">
+          <div class="step-name">${s.node}</div>
+          <div class="step-detail">${escHtml(s.detail || '')}</div>
+          ${time ? `<div class="step-time">${time}</div>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Update active node in graph tab
+  const lastNode = steps[steps.length - 1]?.node;
+  document.getElementById('activeNodeLabel').textContent = lastNode || '—';
+  document.getElementById('activeNodeLabel').style.color = 'var(--accent)';
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function tagClass(type) {
+  const map = { verification:'tag-verification', synthesis:'tag-synthesis',
+                forecasting:'tag-forecasting', general:'tag-general' };
+  return 'tag ' + (map[type] || 'tag-general');
+}
+
+async function runQuery() {
+  const query = document.getElementById('queryInput').value.trim();
+  if (!query) return;
+
+  const base = document.getElementById('apiBase').value.trim();
+  const btn  = document.getElementById('sendBtn');
+  const thinkingDiv  = document.getElementById('thinkingAnim');
+  const answerArea   = document.getElementById('answerArea');
+  const emptyState   = document.getElementById('emptyState');
+  const thinkingText = document.getElementById('thinkingText');
+
+  btn.disabled = true;
+  setStatus('thinking');
+  thinkingDiv.classList.add('show');
+  if (emptyState) emptyState.style.display = 'none';
+
+  // Clear previous
+  answerArea.innerHTML = '';
+  document.getElementById('stepsContainer').innerHTML = '<div class="steps-empty">// RUNNING…</div>';
+
+  const phases = [
+    'Supervisor classifying query…',
+    'Hybrid retrieval (BM25 + Dense)…',
+    'C-RAG grading chunks…',
+    'Specialist agent reasoning…',
+    'Self-RAG reflection…',
+    'Formatting final answer…',
+  ];
+  let phaseIdx = 0;
+  const phaseTimer = setInterval(() => {
+    thinkingText.textContent = phases[Math.min(phaseIdx++, phases.length - 1)];
+  }, 3000);
+
+  const startTime = Date.now();
+
+  try {
+    const resp = await fetch(`${base}/query`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, save_trace: true }),
+    });
+
+    clearInterval(phaseTimer);
+    thinkingDiv.classList.remove('show');
+
+    if (!resp.ok) {
+      const err = await resp.json();
+      answerArea.innerHTML = `<div class="error-card">❌ API Error ${resp.status}<br><br>${escHtml(JSON.stringify(err, null, 2))}</div>`;
+      setStatus('error');
+      return;
+    }
+
+    const data = await resp.json();
+    const duration = ((Date.now() - startTime) / 1000).toFixed(1);
+
+    setStatus('online');
+    renderAnswer(data, duration);
+    renderSteps(data.steps);
+    renderMetrics(data, duration);
+
+    // Auto-switch to trace tab
+    switchTab('trace');
+
+    // Raw JSON
+    document.getElementById('rawJson').textContent = JSON.stringify(data, null, 2);
+
+  } catch(e) {
+    clearInterval(phaseTimer);
+    thinkingDiv.classList.remove('show');
+    setStatus('error');
+    answerArea.innerHTML = `
+      <div class="error-card">
+        ❌ Could not connect to API at <strong>${base}</strong><br><br>
+        Make sure the backend is running:<br>
+        <code>uvicorn main:app --reload --port 8000</code><br><br>
+        Error: ${escHtml(e.message)}
+      </div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderAnswer(data, duration) {
+  const answerArea = document.getElementById('answerArea');
+  const qtype = data.query_type || 'general';
+  const gs    = (data.grounding_score || 0) * 100;
+  const gsColor = gs >= 70 ? 'var(--accent2)' : gs >= 50 ? 'var(--warn)' : 'var(--danger)';
+
+  answerArea.innerHTML = `
+    <div class="answer-card">
+      <div class="answer-header">
+        <div class="answer-meta">
+          <span class="${tagClass(qtype)}">${qtype}</span>
+          <span style="color:var(--dim)">${duration}s</span>
+          ${data.retrieval_attempts > 1
+            ? `<span style="color:var(--danger);font-size:10px">↺ rewritten query</span>` : ''}
+        </div>
+        <div class="grounding-badge">
+          <span style="color:var(--dim)">GROUND</span>
+          <div class="grounding-bar">
+            <div class="grounding-fill" style="width:${gs}%"></div>
+          </div>
+          <span style="color:${gsColor}">${gs.toFixed(0)}%</span>
+        </div>
+      </div>
+      <div class="answer-body">${escHtml(data.answer || 'No answer returned.')}</div>
+      ${data.calc_result ? `
+        <div style="padding:0 18px 18px">
+          <div class="calc-block">
+            <div class="calc-block-label">⚡ CALCULATOR TOOL OUTPUT</div>
+            ${escHtml(data.calc_result)}
+          </div>
+        </div>` : ''}
+    </div>`;
+}
+
+function renderMetrics(data, duration) {
+  document.getElementById('m-querytype').textContent  = data.query_type || '—';
+  document.getElementById('m-duration').textContent   = duration + 's';
+  document.getElementById('m-grounding').textContent  = data.grounding_score
+    ? (data.grounding_score * 100).toFixed(0) + '%' : '—';
+  document.getElementById('m-crag').textContent       = data.crag_passed ? '✓ YES' : '✗ NO';
+  document.getElementById('m-crag').style.color = data.crag_passed ? 'var(--accent2)' : 'var(--danger)';
+  document.getElementById('m-retries').textContent    = data.retrieval_attempts || '—';
+  document.getElementById('m-steps').textContent      = (data.steps || []).length;
+
+  if (data.calc_result) {
+    document.getElementById('calcBlock').style.display = 'block';
+    document.getElementById('calcResult').textContent  = data.calc_result;
+  } else {
+    document.getElementById('calcBlock').style.display = 'none';
+  }
+}
+
+// Allow Ctrl+Enter to submit
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('queryInput').addEventListener('keydown', e => {
+    if (e.ctrlKey && e.key === 'Enter') runQuery();
+  });
+  // Build empty grid
+  const grid = document.querySelector('.empty-grid');
+  if (grid) grid.innerHTML = Array(40).fill('<span></span>').join('');
+});
+</script>
+</body>
+</html>

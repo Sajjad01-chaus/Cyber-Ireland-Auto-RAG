@@ -1,0 +1,58 @@
+# ================================================================
+# Cyber Ireland 2022 — Multi-Agent RAG System
+# Requirements (updated March 2026 — tested compatible versions)
+# ================================================================
+# Install: pip install -r requirements.txt
+# Python:  3.10 / 3.11 / 3.12 (recommended: 3.11)
+# ================================================================
+
+# ── Web Framework ────────────────────────────────────────────────
+fastapi>=0.110.0,<1.0.0
+uvicorn[standard]>=0.29.0
+python-dotenv>=1.0.1
+pydantic>=2.7.0
+
+# ── PDF Parsing (dual-parser strategy) ──────────────────────────
+pdfplumber>=0.11.0          # table extraction with bounding boxes
+pymupdf>=1.24.0             # text + font metadata extraction
+                            # NOTE: installs as 'fitz' in Python
+
+# ── Embeddings (local, no API cost) ─────────────────────────────
+sentence-transformers>=3.0.0   # was 2.7.0 — v3 has API changes
+                               # encode() normalize_embeddings still works
+torch>=2.3.0                   # sentence-transformers dependency
+                               # CPU-only install saves space:
+                               # pip install torch --index-url https://download.pytorch.org/whl/cpu
+
+# ── Vector Store ─────────────────────────────────────────────────
+chromadb>=0.5.3                # PersistentClient stable since 0.5.3
+
+# ── Sparse / Keyword Search ──────────────────────────────────────
+rank-bm25>=0.2.2               # BM25Okapi — no breaking changes
+
+# ── LangGraph (Agent Orchestration) ─────────────────────────────
+# IMPORTANT: 0.1.x → 0.2.x had major breaking changes in StateGraph
+# Our code uses the 0.2.x+ API. Do NOT downgrade below 0.2.0
+langgraph>=0.2.0               # 1.0 released Oct 2025 — zero breaking changes from 0.2.x
+
+# ── LangChain (must all be same minor version 0.3.x) ────────────
+# IMPORTANT: 0.2.x and 0.3.x are NOT compatible with each other
+# All four packages below MUST be 0.3.x together
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-community>=0.3.0
+
+# ── Groq LLM Integration ─────────────────────────────────────────
+# IMPORTANT: 0.1.x → 1.x was a major version jump
+# ChatGroq constructor is same but some kwargs changed
+langchain-groq>=1.0.0          # was 0.1.5 — use 1.x for stability
+
+# ── Reranking (cross-encoder) ────────────────────────────────────
+# Bundled inside sentence-transformers — no extra install needed
+# Uses: CrossEncoder('cross-encoder/ms-marco-MiniLM-L-6-v2')
+
+# ── Utilities ────────────────────────────────────────────────────
+numpy>=1.26.4,<2.0.0           # Pin below 2.0 — numpy 2.x breaks
+                               # some chromadb + sentence-transformers versions
+tiktoken>=0.7.0                # token counting
+tenacity>=8.3.0                # retry logic for Groq rate limits

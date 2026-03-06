@@ -1,0 +1,88 @@
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# =========================
+# Virtual environments
+# =========================
+myvenv/
+myvenv
+venv/
+.env/
+.env.*
+.venv/
+
+# =========================
+# Environment variables
+# =========================
+.env
+.env.local
+
+# =========================
+# Logs
+# =========================
+logs/
+*.log
+
+# =========================
+# Vector databases / indexes
+# =========================
+chroma_db/
+*.pkl
+*.faiss
+
+# =========================
+# Temporary files
+# =========================
+*.tmp
+*.temp
+*.swp
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# IDEs / Editors
+# =========================
+.vscode/
+.idea/
+*.iml
+
+# =========================
+# Jupyter notebooks
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Node / frontend builds
+# =========================
+node_modules/
+dist/
+
+# =========================
+# Coverage / testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =========================
+# Local datasets
+# =========================
+data/
+*.pdf
+
+KB/
+State-of-the-Cyber-Security-Sector-in-Ireland-2022-Report.pdf
