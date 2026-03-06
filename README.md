@@ -23,7 +23,7 @@ The architecture integrates:
 - Self-Reflection (Self-RAG)
 - Tool-based mathematical computation
 
-![System UI](docs/ui_example.png)
+![System UI](https://github.com/Sajjad01-chaus/Cyber-Ireland-Auto-RAG/blob/main/doc/Screenshot%202026-03-06%20073958.png)
 
 ## Architecture Overview
 
