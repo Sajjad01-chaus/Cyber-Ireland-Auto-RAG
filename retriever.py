@@ -9,16 +9,6 @@ Pipeline:
     ├─► BM25 (exact keyword match, great for numbers/names)      top-K
     ├─► ChromaDB (semantic similarity, great for paraphrased Q)  top-K
     └─► RRF merge → cross-encoder re-rank → final top-N chunks
-
-Why RRF?
-  - Does not require normalizing scores across systems
-  - Mathematically sound: score = Σ 1/(rank + 60)
-  - Consistently outperforms score-based fusion in benchmarks
-
-Why cross-encoder re-ranking?
-  - Bi-encoder embeddings compare query/doc independently (fast but approximate)
-  - Cross-encoder reads query+doc together → much more accurate relevance score
-  - Using ms-marco-MiniLM-L-6-v2: small, fast, excellent for passage retrieval
 """
 
 import os

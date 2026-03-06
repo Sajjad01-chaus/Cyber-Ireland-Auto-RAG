@@ -1,15 +1,5 @@
 """
-ETL Pipeline — Advanced PDF Ingestion (v2 — Fixed)
-====================================================
-Fixes applied vs v1:
-  FIX 1: Table extraction now uses 3-strategy cascade instead of lines_strict only
-          → handles colored-background tables (like TABLE 4.3, 4.4, 4.5 in the report)
-  FIX 2: Table title capture — pymupdf text blocks immediately above tables are
-          detected and attached as section_heading to the table chunk
-  FIX 3: Two-column layout detection — pages with 2-column layout are cropped
-          into left/right halves before extraction to prevent column mixing
-  FIX 4: Semantic chunks now get 1-sentence overlap appended/prepended
-          to prevent facts from being stranded at chunk boundaries
+ETL Pipeline — PDF Ingestion 
 
 Architecture:
   PASS 1 (pymupdf/fitz):
@@ -70,7 +60,7 @@ COLLECTION_NAME = "cyber_ireland_2022"
 SEMANTIC_SPLIT_THRESHOLD = 0.45   # cosine sim below this → new chunk
 MAX_CHUNK_CHARS          = 800
 MIN_CHUNK_CHARS          = 80
-CHUNK_OVERLAP_SENTENCES  = 1      # FIX 4: sentences of overlap between chunks
+CHUNK_OVERLAP_SENTENCES  = 1      
 
 # Two-column detection: if text blocks are mostly in left half AND right half
 TWO_COL_THRESHOLD = 0.3   # if >30% blocks in each half → two-column page
@@ -83,8 +73,6 @@ TWO_COL_THRESHOLD = 0.3   # if >30% blocks in each half → two-column page
 def is_two_column_page(page) -> bool:
     """
     Detect if a page uses a two-column layout.
-    Checks if significant text blocks exist in both left and right halves.
-    The Cyber Ireland report uses two-column layout on some pages (e.g. page 20).
     """
     page_width = page.rect.width
     mid        = page_width / 2
@@ -199,13 +187,12 @@ def extract_text_with_structure(pdf_path: str) -> Tuple[List[Dict], Dict[int, Li
             if TABLE_TITLE_RE.match(block_text):
                 table_titles[page_num_1].append(block_text)
                 logger.debug(f"  Table title found p{page_num_1}: {block_text[:60]}")
-                is_heading = True   # treat table titles as headings too
+                is_heading = True   
 
             if is_heading:
                 current_heading = block_text
 
             # Skip duplicate text blocks on two-column pages
-            # (we already extracted by column above)
             if is_two_column_page(page):
                 continue
 
@@ -226,37 +213,10 @@ def extract_text_with_structure(pdf_path: str) -> Tuple[List[Dict], Dict[int, Li
     return elements, table_titles
 
 
-# ═══════════════════════════════════════════════════════════════════
-# FIX 5: Figure / Chart Data Harvester
-# ═══════════════════════════════════════════════════════════════════
+
 
 def extract_figure_data(pdf_path: str) -> List[Dict]:
-    """
-    FIX 5 — Handles pages like page 18 with bar/donut charts.
-
-    Charts themselves are rendered images — no parser reads pixels.
-    BUT chart LABELS (numbers, percentages, axis labels) are vector text
-    embedded in the PDF and readable by pymupdf.
-
-    Strategy:
-      1. Detect pages containing FIGURE titles
-      2. Collect ALL small numeric/percentage text blocks on that page
-         that are likely chart labels (short, contain digits/%)
-      3. Group them by proximity (x/y bounding box clustering)
-      4. Pair with figure title to create a synthetic "figure summary" chunk:
-
-         FIGURE 4.1 NUMBER OF CYBER SECURITY EMPLOYEES BY COUNTRY OF ORIGIN
-         Chart data points: US=4,046 (55%) | IRELAND=2,101 (29%) |
-         UK=475 (6%) | REST OF EU=253 (3%) | JAPAN=196 (3%) | ...
-
-      This chunk is searchable by BM25 and dense retrieval,
-      so queries like "how many US-based employees" will hit it.
-
-    Limitation documented:
-      We cannot extract bar heights or donut proportions as geometry.
-      We rely on text labels being vector text (true for this PDF).
-      Scanned PDFs would need OCR (not implemented here).
-    """
+   
     FIGURE_RE   = re.compile(r'^FIGURE\s+\d+[\.\d]*', re.IGNORECASE)
     # Matches short numeric/percentage strings likely to be chart labels
     LABEL_RE    = re.compile(r'^[\d,\.]+(%|k|m|bn)?$|^\d+%$', re.IGNORECASE)
@@ -314,7 +274,7 @@ def extract_figure_data(pdf_path: str) -> List[Dict]:
                     f"Data points: {data_str}"
                 )
             else:
-                # Even with no label pairs, store figure title + any numbers found
+                # with no label pairs, store figure title + any numbers found
                 nums = " | ".join(data_labels[:10]) if data_labels else "see document"
                 chunk_text = (
                     f"{fig_title}\n"
@@ -346,7 +306,6 @@ def extract_figure_data(pdf_path: str) -> List[Dict]:
 def table_to_markdown(table: List[List[Any]], title: str = "") -> str:
     """
     Convert pdfplumber table → Markdown with optional title prepended.
-    FIX 2: title is now injected at the top of the table chunk.
     """
     if not table:
         return ""
@@ -369,7 +328,7 @@ def table_to_markdown(table: List[List[Any]], title: str = "") -> str:
 
 def extract_tables_from_page(page, page_num: int) -> List[List[List[Any]]]:
     """
-    FIX 1: 3-strategy cascade for table detection.
+    3-strategy cascade for table detection.
 
     Strategy A: lines_strict — for tables with explicit drawn borders
     Strategy B: lines (relaxed) — partial borders
@@ -438,7 +397,6 @@ def extract_tables_from_page(page, page_num: int) -> List[List[List[Any]]]:
 def extract_tables(pdf_path: str, table_titles: Dict[int, List[str]]) -> List[Dict]:
     """
     Extract all tables from the PDF using the 3-strategy cascade.
-    FIX 2: Injects detected table title into each table chunk's section_heading.
     """
     table_elements = []
 
@@ -500,18 +458,10 @@ def extract_tables(pdf_path: str, table_titles: Dict[int, List[str]]) -> List[Di
     return table_elements
 
 
-# ═══════════════════════════════════════════════════════════════════
-# FIX 4: Semantic Chunker with overlap
-# ═══════════════════════════════════════════════════════════════════
 
 class SemanticChunker:
     """
     Splits text at semantic boundaries (cosine similarity valleys).
-
-    FIX 4 — Overlap:
-      After splitting, each chunk gets the LAST sentence of the previous chunk
-      prepended, and the FIRST sentence of the next chunk appended.
-      This ensures facts at chunk boundaries are retrievable from either chunk.
 
     Tables and headings are always kept atomic (never split).
     """
@@ -528,7 +478,6 @@ class SemanticChunker:
         if metadata.get("element_type") in ("table", "heading"):
             return [{"text": text, "metadata": metadata}]
 
-        # Short enough → single chunk, no split needed
         if len(text) <= MAX_CHUNK_CHARS:
             return [{"text": text, "metadata": metadata}]
 
@@ -566,7 +515,7 @@ class SemanticChunker:
         if not groups:
             return [{"text": text, "metadata": metadata}]
 
-        # FIX 4: Add 1-sentence overlap between consecutive chunks
+        # Add 1-sentence overlap between consecutive chunks
         overlapped: List[str] = []
         for idx, group in enumerate(groups):
             chunk_sentences = list(group)
@@ -614,7 +563,7 @@ class SemanticChunker:
 
 
 # ═══════════════════════════════════════════════════════════════════
-# Parent-Child Chunk Builder (unchanged logic, new metadata)
+# Parent-Child Chunk Builder 
 # ═══════════════════════════════════════════════════════════════════
 
 def build_parent_child_chunks(
@@ -626,14 +575,11 @@ def build_parent_child_chunks(
     Tables always become their own atomic parent + child pair.
     Text elements are grouped into parents per page, then semantically chunked.
 
-    IDs are generated using a global counter to guarantee uniqueness.
-    Previously used MD5(text[:40]) which caused DuplicateIDError in ChromaDB
-    when multiple chunks shared the same opening text.
     """
     parents : List[Dict] = []
     children: List[Dict] = []
 
-    # Global counters — guarantees unique IDs regardless of text content
+    # Global counters 
     parent_counter = [0]
     child_counter  = [0]
 
@@ -716,7 +662,7 @@ def build_parent_child_chunks(
 
 
 # ═══════════════════════════════════════════════════════════════════
-# ChromaDB + BM25 Loaders (unchanged)
+# ChromaDB + BM25 Loaders 
 # ═══════════════════════════════════════════════════════════════════
 
 class LocalEmbeddingFunction(embedding_functions.EmbeddingFunction):
@@ -796,14 +742,14 @@ def save_debug(parents: List[Dict], children: List[Dict]):
 # ═══════════════════════════════════════════════════════════════════
 
 def run_ingestion():
-    logger.info("╔══════════════════════════════════════════╗")
-    logger.info("║  Cyber Ireland 2022 — ETL Pipeline v2    ║")
-    logger.info("╠══════════════════════════════════════════╣")
-    logger.info("║  FIX 1: 3-strategy table cascade         ║")
-    logger.info("║  FIX 2: Table title injection            ║")
-    logger.info("║  FIX 3: Two-column page detection        ║")
-    logger.info("║  FIX 4: Semantic chunk overlap           ║")
-    logger.info("╚══════════════════════════════════════════╝")
+    logger.info("╔═══════════════════════════════════╗")
+    logger.info("║  Cyber Ireland 2022 — ETL Pipeline║")
+    logger.info("╠═══════════════════════════════════╣")
+    logger.info("║  3-strategy table cascade         ║")
+    logger.info("║  Table title injection            ║")
+    logger.info("║  Two-column page detection        ║")
+    logger.info("║  Semantic chunk overlap           ║")
+    logger.info("╚═══════════════════════════════════╝")
 
     if not Path(PDF_PATH).exists():
         raise FileNotFoundError(
@@ -845,12 +791,12 @@ def run_ingestion():
     logger.info("── Building BM25 sparse index …")
     build_bm25_index(children)
 
-    logger.info("╔══════════════════════════════════════════╗")
-    logger.info("║   ETL Pipeline Complete ✅                ║")
-    logger.info(f"║   {len(parents):>5} parent chunks                  ║")
-    logger.info(f"║   {len(children):>5} child chunks (indexed)        ║")
-    logger.info(f"║   {len(table_elements):>5} tables extracted              ║")
-    logger.info(f"║   {len(figure_elements):>5} figure summaries created      ║")
+    logger.info("╔══════════════════════════════════════════╗ ")
+    logger.info("║   ETL Pipeline Complete ✅               ║")
+    logger.info(f"║   {len(parents):>5} parent chunks                   ║")
+    logger.info(f"║   {len(children):>5} child chunks (indexed)         ║")
+    logger.info(f"║   {len(table_elements):>5} tables extracted         ║")
+    logger.info(f"║   {len(figure_elements):>5} figure summaries created║")
     logger.info("╚══════════════════════════════════════════╝")
     return parents, children
 

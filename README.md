@@ -1,8 +1,29 @@
-# Cyber Ireland 2022 — Multi-Agent Autonomous RAG System
+# Cyber Ireland — Multi-Agent Autonomous RAG System
 
-> **Stack:** LangGraph · Groq Llama-3.3-70b · BAAI/bge-large · ChromaDB · BM25 · Cross-Encoder · C-RAG · Self-RAG
+An **agentic Retrieval-Augmented Generation (RAG) system** that transforms the *Cyber Ireland 2022 Report* into a **queryable knowledge system capable of multi-step reasoning, verification, and forecasting**.
+
+The system combines **hybrid retrieval, multi-agent reasoning, and self-correction loops** to produce reliable, grounded answers.
 
 ---
+
+## System Overview
+
+This system ingests the Cyber Ireland report and allows an autonomous agent to answer complex questions such as:
+
+• Extracting **verified statistics with citations**  
+• Performing **data synthesis across tables**  
+• Executing **mathematical forecasting calculations**
+
+The architecture integrates:
+
+- Hybrid Retrieval (BM25 + Dense embeddings)
+- Cross-Encoder re-ranking
+- LangGraph multi-agent orchestration
+- Corrective RAG (C-RAG)
+- Self-Reflection (Self-RAG)
+- Tool-based mathematical computation
+
+![System UI](docs/ui_example.png)
 
 ## Architecture Overview
 
@@ -62,6 +83,16 @@
 │                            └── BM25 (sparse index)                 │
 └────────────────────────────────────────────────────────────────────┘
 ```
+
+# Evaluation Results
+
+The system was evaluated using the **three required scenarios provided in the assignment**.
+
+| Test | Scenario | Result |
+|-----|-----|-----|
+| Test 1 | Verification Challenge | PASS |
+| Test 2 | Data Synthesis Challenge | PASS |
+| Test 3 | Forecasting Challenge | PASS |
 
 ---
 
@@ -128,6 +159,12 @@ uvicorn main:app --reload --port 8000
 ```
 
 Interactive docs: [http://localhost:8000/docs](http://localhost:8000/docs)
+
+### start UI
+```
+python -m http.server 5500
+```
+then open: http://localhost:5500
 
 ### 8. Example API Calls
 
@@ -224,26 +261,3 @@ LLMs cannot reliably compute `(17000/7000)^(1/8) - 1`. This system:
 | **Deployment** | Docker Compose (API + Qdrant) → Kubernetes on GKE/EKS |
 
 ---
-
-## Project Structure
-
-```
-cyber_rag_v2/
-├── etl/
-│   ├── __init__.py
-│   └── ingest.py           # PDF parsing, semantic chunking, ChromaDB + BM25 loading
-├── agent/
-│   ├── __init__.py
-│   ├── retriever.py        # HybridRetriever: BM25 + Dense + RRF + Rerank
-│   ├── prompts.py          # All LLM prompts (centralised)
-│   └── graph.py            # LangGraph multi-agent graph + all node functions
-├── logs/
-│   ├── etl_parents.json    # ETL debug output
-│   ├── etl_children.json   # ETL debug output
-│   └── traces/             # Per-query agent traces (auto-generated)
-├── main.py                 # FastAPI app
-├── run_tests.py            # Runs all 3 evaluation scenarios
-├── requirements.txt
-├── .env.example
-└── README.md
-```
